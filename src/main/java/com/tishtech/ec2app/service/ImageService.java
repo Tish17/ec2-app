@@ -49,7 +49,9 @@ public class ImageService {
     public ImageMetadataResponse getRandomMetadata() {
         log.info("getRandomMetadata() - started");
         ListObjectsV2Result result = amazonS3.listObjectsV2(bucketName);
-        List<S3ObjectSummary> objects = result.getObjectSummaries();
+        List<S3ObjectSummary> objects = result.getObjectSummaries().stream()
+                .filter(object -> isImage(object.getKey()))
+                .toList();
         if (objects.isEmpty()) {
             throw new RuntimeException("No images in bucket");
         }
@@ -75,6 +77,10 @@ public class ImageService {
         log.info("deleteImage() - started with fileName = {}", fileName);
         amazonS3.deleteObject(bucketName, fileName);
         log.info("deleteImage() - ended with fileName = {}", fileName);
+    }
+
+    private boolean isImage(String fileName) {
+        return fileName.toLowerCase().endsWith(".jpg") || fileName.toLowerCase().endsWith(".png");
     }
 }
 
