@@ -25,6 +25,7 @@ public class ImageService {
 
     private final AmazonS3 amazonS3;
     private final ImageRepository imageRepository;
+    private final NotificationService notificationService;
 
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
@@ -60,11 +61,12 @@ public class ImageService {
     @Transactional
     public void uploadImage(MultipartFile file) {
         log.info("uploadImage() - started with fileName = {}", file.getOriginalFilename());
-        saveImage(file);
         try {
+            Image image = saveImage(file);
             ObjectMetadata metadata = new ObjectMetadata();
             metadata.setContentLength(file.getSize());
             amazonS3.putObject(bucketName, file.getOriginalFilename(), file.getInputStream(), metadata);
+            notificationService.publish(getImageMetadata(image));
             log.info("uploadImage() - ended with fileName = {}", file.getOriginalFilename());
         } catch (IOException e) {
             throw new RuntimeException("Upload failed", e);
@@ -79,15 +81,16 @@ public class ImageService {
         log.info("deleteImage() - ended with fileName = {}", fileName);
     }
 
-    private void saveImage(MultipartFile file) {
+    private Image saveImage(MultipartFile file) {
         log.info("saveImage() - started with fileName = {}", file.getOriginalFilename());
-        imageRepository.save(Image.builder()
+        Image image = imageRepository.save(Image.builder()
                 .name(file.getOriginalFilename())
                 .extension(getExtension(Objects.requireNonNull(file.getOriginalFilename())))
                 .size(file.getSize())
                 .lastModified(new Date())
                 .build());
         log.info("saveImage() - ended with fileName = {}", file.getOriginalFilename());
+        return image;
     }
 
     private String getExtension(String fileName) {
